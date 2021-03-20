@@ -48,6 +48,8 @@ class Tasks:
         for _ in privacy_python['response']['players']:
             if _['communityvisibilitystate'] == 1:
                 return False
+            else:
+                return True
 
     def summary_task(self,user_id):
         api = WebAPI(key='E2F33A25C7632339FB2C348D3786332A')
@@ -64,9 +66,10 @@ class Tasks:
             print(" |-[Location] "+ _['loccountrycode'])
             print(" |")
             print(" |-[Last online] "+ datetime.utcfromtimestamp(int(_['lastlogoff'])).strftime('%d %b %Y'))
+            print(" |-")
             print()
 
-    def games_task(self,user_id,free_games):
+    def games_task(self,user_id,free_games, all_details):
         api = WebAPI(key='E2F33A25C7632339FB2C348D3786332A')
         #print(user_id,free_games)
         api.call('IPlayerService.GetOwnedGames', steamid = user_id, include_played_free_games = free_games, include_appinfo = 1, appids_filter = 0, include_free_sub = 0)
@@ -78,21 +81,28 @@ class Tasks:
         print(" |")
         print(" |-[Game count] "+ str(games_python['response']['game_count']) + " titles")
         title_no = 0
+        total_playtime = 0
         for _ in games_python['response']['games']:
             title_no += 1
-            print(" |")
-            print(" |--["+str(title_no)+"] " + str((_['name']).upper()))
             playtime_hour = int(round(_['playtime_forever']/60,0))
             playtime_minutes = int(_['playtime_forever']%60)
-            print(" |-------[Playtime] " + str(playtime_hour) + "h " + str(playtime_minutes) + "m")
-            print(" |-------[AppID] " + str(_['appid']))
+            total_playtime += int(_['playtime_forever'])
+            if all_details:
+                print(" |")
+                print(" |--["+str(title_no)+"] " + str((_['name']).upper()))
+                print(" |-------[Playtime] " + str(playtime_hour) + "h " + str(playtime_minutes) + "m")
+                print(" |-------[AppID] " + str(_['appid']))
+        print(" |")
+        print(" |-[Total hours played] " + str(int(round(total_playtime/60,0))) + "h " + str(int(total_playtime%60)) + "m")
         print()
 
     def help_task(self):
         print("---[Help]---")
-        print(" |-[s] User general summary")
+        print(" |-[s] User summary")
         print(" |")
         print(" |-[g] Games summary")
+        print(" |-----[f,a] Optional. 'f' includes free games and 'a' displays all games information.")
+        print(' |-----[example] >>> g -fa includes free games AND displays information for every title.')
         print(" |")
         print(" |-[u] Change user")
         print(" |")
@@ -102,7 +112,7 @@ class Tasks:
 
 class Menu:
     def __init__(self):
-        self._selection = "none"
+        self._selection = "e"
 
     @property
     def selection(self):
@@ -112,10 +122,11 @@ class Menu:
     @selection.setter
     def selection(self, user_selection):
         #print("--set called--")
-        valid_selections  = ["s", "g", "h", "x", "u", "none"]
+        valid_selections  = ["s", "g", "h", "x", "u", "e"]
         bad_input = 0
+        #print("here " + user_selection[0])
         for _ in valid_selections:
-            if user_selection == _:
+            if user_selection[0] == _:
                 self._selection = user_selection
                 break
             else:
@@ -131,43 +142,55 @@ class Menu:
             while not has_id:
                 has_id, my_user_id = execute.user_task()
             user_privacy = execute.privacy_task(my_user_id)
-            if not user_privacy:
-                print(">>> User is set to private, you can only view summary (s).")
-            if menu.selection == "none":
+            if menu.selection == "e":
                 selection_valid = False
             while not selection_valid:
-                if menu.selection != "none":
+                if menu.selection != "e":
                     selection_valid = True
+                    #print(menu.selection)
                 else:
                     menu.selection = input("> ").lower()
             if menu.selection == 'h':
                 execute.help_task()
-                menu.selection = "none"
+                menu.selection = "e"
             elif menu.selection == 's':
                 execute.summary_task(my_user_id)
-                menu.selection = "none"
+                menu.selection = "e"
             elif menu.selection == 'u':
                 has_id, my_user_id = execute.user_task()
-                menu.selection = "none"
+                menu.selection = "e"
             elif menu.selection == 'g':
                 if user_privacy:
                     #print(my_user_id)
-                    free_games_valid = False
-                    while not free_games_valid:
-                        show_free_games = input('>>> Include free games? (y/n): ').lower()
-                        while show_free_games not in ["y", "n"]:
-                            show_free_games = input('Error: Invalid input, try again: ').lower()
-                        free_games_valid = True
-                    if show_free_games == 'y':
-                        execute.games_task(user_id = my_user_id, free_games = 1)
-                    elif show_free_games == 'n':
-                        execute.games_task(user_id = my_user_id, free_games = 0)
-                    menu.selection = "none"
+                    execute.games_task(user_id = my_user_id, free_games = 0, all_details = False)
+                    menu.selection = "e"
                 else:
                     print(">>> Error: User is set to private, you can only view summary (s).")
-                    menu.selection = "none"
+                    menu.selection = "e"
+            elif len(menu.selection) > 1:
+                if menu.selection[0] == 'g':
+                    if user_privacy:
+                        games_option_valid = True
+                        show_free_games = 0
+                        show_all_details = False
+                        for _ in menu.selection[3:len(menu.selection)]:
+                            if _ == 'f':
+                                show_free_games = 1
+                            elif _ == 'a':
+                                show_all_details = True
+                            elif _ != 'a' and _ != 'f':
+                                print("Error: Parameters not right. Enter h for help.")
+                                menu.selection = "e"
+                                games_option_valid = False
+                        if games_option_valid:
+                            execute.games_task(user_id= my_user_id, free_games = show_free_games, all_details = show_all_details)
+                        menu.selection = "e"
+                    else:
+                        print(">>> Error: User is set to private, you can only view summary (s).")
+                        menu.selection = "e"
             elif menu.selection == 'x':
                 running = False
+                
     
 if __name__ == "__main__":
     menu = Menu()
