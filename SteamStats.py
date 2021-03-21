@@ -4,78 +4,98 @@ from steam.webapi import WebAPI
 import json
 from datetime import datetime
 from datetime import time
+import requests
 
-class ID:
+class Tasks():
     def __init__(self):
+        self._api = WebAPI(key='E2F33A25C7632339FB2C348D3786332A')
         self._id_value = 0
 
     @property
     def id_value(self):
-        #print("--get called--")
         return self._id_value
 
     @id_value.setter
     def id_value(self, id_link):
-        #print("--set called--")
         my_id = steam.steamid.from_url(id_link)
         if hasattr(my_id, 'as_64'):
             self._id_value = my_id.as_64
-            print()
-            print('>>> ID found: ' + str(self._id_value))
-            print()
         else:
             self._id_value = 0
-            print('>>> Error: URL not valid.')
-
-class Tasks:
-    def __init__(self):
-        pass
-
+            
     def user_task(self):
-        id = ID()
         print()
-        id.id_value = input(">>> Enter community url: ")
-        if id.id_value != 0:
-            return True, id.id_value
+        self.id_value = input(">>> Enter community url: ")
+        if self.id_value != 0:
+            print('>>> ID found: ' + str(self._id_value))
+            print()
+            return True
         else:
-            return False, id.id_value
+            print('>>> Error: URL not valid.')
+            return False
     
-    def privacy_task(self,user_id):
-        api = WebAPI(key='E2F33A25C7632339FB2C348D3786332A')
-        api.call('ISteamUser.GetPlayerSummaries', steamids = user_id)
-        privacy_json = api.ISteamUser.GetPlayerSummaries(steamids = user_id, format='json', raw=True)
+    def privacy_task(self):
+        self._api.call('ISteamUser.GetPlayerSummaries', steamids = self._id_value)
+        privacy_json = self._api.ISteamUser.GetPlayerSummaries(steamids = self._id_value, format='json', raw=True)
         privacy_python = json.loads(privacy_json)
         for _ in privacy_python['response']['players']:
             if _['communityvisibilitystate'] == 1:
                 return False
-            else:
+            elif _['communityvisibilitystate'] == 3:
                 return True
 
-    def summary_task(self,user_id):
-        api = WebAPI(key='E2F33A25C7632339FB2C348D3786332A')
-        api.call('ISteamUser.GetPlayerSummaries', steamids = user_id)
-        summary_json = api.ISteamUser.GetPlayerSummaries(steamids = user_id, format='json', raw=True)
+    def summary_task(self):
+        self._api.call('ISteamUser.GetPlayerSummaries', steamids = self._id_value)
+        summary_json = self._api.ISteamUser.GetPlayerSummaries(steamids = self._id_value, format='json', raw=True)
         summary_python = json.loads(summary_json)
-
+        short_key = "1e9dd91ae565d468bbd8760f0316457072c19"
         for _ in summary_python['response']['players']:
+            short_avatar = f"https://cutt.ly/api/api.php?key={short_key}&short={_['avatarfull']}"
+            short_avatar_data = requests.get(short_avatar).json()["url"]
+            if short_avatar_data["status"] == 7:
+                shortened_avatar = short_avatar_data["shortLink"]
+            else:
+                shortened_avatar = "Error shortening link."
+            short_page = f"https://cutt.ly/api/api.php?key={short_key}&short={_['profileurl']}"
+            short_page_data = requests.get(short_page).json()["url"]
+            if short_page_data["status"] == 7:
+                shortened_page = short_page_data["shortLink"]
+            else:
+                shortened_page = "Error shortening link."
+            if _['communityvisibilitystate'] == 3:
+                profile_state = "Public"
+            else:
+                profile_state = "Private"
+            if _['personastate'] == 0:
+                current_status = "Offline"
+            elif _['personastate'] == 1:
+                current_status = "Online"
+            elif _['personastate'] == 3:
+                current_status = "Away"
+            elif _['personastate'] == 4:
+                current_status = "Snooze"
+            else:
+                current_status = "Other"
             print()
             print("---[Steam user " + _['personaname'] + " selected]---")
             print(" |")
-            #print(" |_ Avatar link: "+ _['avatarfull'])
-            #print(" |")
             print(" |-[Location] "+ _['loccountrycode'])
             print(" |")
             print(" |-[Last online] "+ datetime.utcfromtimestamp(int(_['lastlogoff'])).strftime('%d %b %Y'))
-            print(" |-")
+            print(" |")
+            print(" |-[Avatar] "+ shortened_avatar)
+            print(" |")
+            print(" |-[Privacy] "+ profile_state)
+            print(" |")
+            print(" |-[Current status] "+current_status)
+            print(" |")
+            print(" |-[Profile page] "+shortened_page)
             print()
 
-    def games_task(self,user_id,free_games, all_details):
-        api = WebAPI(key='E2F33A25C7632339FB2C348D3786332A')
-        #print(user_id,free_games)
-        api.call('IPlayerService.GetOwnedGames', steamid = user_id, include_played_free_games = free_games, include_appinfo = 1, appids_filter = 0, include_free_sub = 0)
-        games_json = api.IPlayerService.GetOwnedGames(steamid = user_id, include_played_free_games = free_games, include_appinfo = 1, appids_filter = 0, include_free_sub = 0, format = 'json', raw = True)
+    def games_task(self,free_games, all_details):
+        self._api.call('IPlayerService.GetOwnedGames', steamid = self._id_value, include_played_free_games = free_games, include_appinfo = 1, appids_filter = 0, include_free_sub = 0)
+        games_json = self._api.IPlayerService.GetOwnedGames(steamid = self._id_value, include_played_free_games = free_games, include_appinfo = 1, appids_filter = 0, include_free_sub = 0, format = 'json', raw = True)
         games_python = json.loads(games_json)
-        #print(games_python,games_json)
         print()
         print("---[Game information]---")
         print(" |")
@@ -110,21 +130,21 @@ class Tasks:
         print(" |")
         print(" |-[x] Exit quicksteam")
 
+    def friends_task(self):
+        self._api.call('ISteamUser.GetFriendList', steamid = self._id_value)
+
 class Menu:
     def __init__(self):
         self._selection = "e"
 
     @property
     def selection(self):
-        #print("--get called--")
         return self._selection
 
     @selection.setter
     def selection(self, user_selection):
-        #print("--set called--")
         valid_selections  = ["s", "g", "h", "x", "u", "e"]
         bad_input = 0
-        #print("here " + user_selection[0])
         for _ in valid_selections:
             if user_selection[0] == _:
                 self._selection = user_selection
@@ -137,32 +157,31 @@ class Menu:
     def start(self):
         running = True
         has_id = False
+        execute = Tasks()
         while running:
-            execute = Tasks()
             while not has_id:
-                has_id, my_user_id = execute.user_task()
-            user_privacy = execute.privacy_task(my_user_id)
+                has_id = execute.user_task()
+            user_privacy = execute.privacy_task()
             if menu.selection == "e":
                 selection_valid = False
             while not selection_valid:
                 if menu.selection != "e":
                     selection_valid = True
-                    #print(menu.selection)
                 else:
                     menu.selection = input("> ").lower()
             if menu.selection == 'h':
                 execute.help_task()
                 menu.selection = "e"
             elif menu.selection == 's':
-                execute.summary_task(my_user_id)
+                execute.summary_task()
                 menu.selection = "e"
             elif menu.selection == 'u':
-                has_id, my_user_id = execute.user_task()
+                has_id = execute.user_task()
                 menu.selection = "e"
             elif menu.selection == 'g':
                 if user_privacy:
                     #print(my_user_id)
-                    execute.games_task(user_id = my_user_id, free_games = 0, all_details = False)
+                    execute.games_task(free_games = 0, all_details = False)
                     menu.selection = "e"
                 else:
                     print(">>> Error: User is set to private, you can only view summary (s).")
@@ -183,7 +202,7 @@ class Menu:
                                 menu.selection = "e"
                                 games_option_valid = False
                         if games_option_valid:
-                            execute.games_task(user_id= my_user_id, free_games = show_free_games, all_details = show_all_details)
+                            execute.games_task(free_games = show_free_games, all_details = show_all_details)
                         menu.selection = "e"
                     else:
                         print(">>> Error: User is set to private, you can only view summary (s).")
