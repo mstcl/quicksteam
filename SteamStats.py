@@ -8,7 +8,8 @@ import requests
 
 class Tasks():
     def __init__(self):
-        self._api = WebAPI(key='E2F33A25C7632339FB2C348D3786332A')
+        self._key = 'E2F33A25C7632339FB2C348D3786332A'
+        self._api = WebAPI(key=self._key)
         self._id_value = 0
 
     @property
@@ -105,10 +106,30 @@ class Tasks():
             playtime_minutes = int(_['playtime_forever']%60)
             total_playtime += int(_['playtime_forever'])
             if all_details:
+                achievement_param = {'key': self._key, 'steamid': self._id_value, 'appid': str(_['appid'])}
+                achievement_error = requests.get('https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/?', params=achievement_param)
+                if achievement_error.status_code != 200:
+                    achievement_result = "Unavailable"
+                elif achievement_error.status_code == 200:
+                    self._api.call('ISteamUserStats.GetPlayerAchievements', steamid = self._id_value, appid = _['appid'])
+                    achievements_dict = json.loads(self._api.ISteamUserStats.GetPlayerAchievements(steamid = self._id_value, appid = _['appid'], format = 'json', raw = True))
+                    achieved = 0
+                    not_achieved = 0
+                    if 'achievements' in achievements_dict['playerstats'].keys():
+                        for achievement in achievements_dict['playerstats']['achievements']:
+                            if achievement['achieved'] == 1:
+                                achieved += 1
+                            elif achievement['achieved'] == 0:
+                                not_achieved += 1
+                        achievement_result = str(achieved) + '/' + str(not_achieved + achieved) + " (" + str(int(achieved/(not_achieved + achieved)*100)) + "%)"
+                    else:
+                        achievement_result = "Unavailable"
                 print(" |")
-                print(" |--["+str(title_no)+"] " + str((_['name']).upper()))
+                print(" |--["+str(title_num)+"] " + str((_['name']).upper()))
                 print(" |-------[Playtime] " + str(playtime_hour) + "h " + str(playtime_minutes) + "m")
                 print(" |-------[AppID] " + str(_['appid']))
+                print(" |-------[Achievements] "+ achievement_result)
+
         print(" |")
         print(" |-[Total hours played] " + str(int(round(total_playtime/60,0))) + "h " + str(int(total_playtime%60)) + "m")
         print()
@@ -234,7 +255,6 @@ class Menu:
             elif menu.selection == 'x':
                 running = False
                 
-    
 if __name__ == "__main__":
     menu = Menu()
     menu.start()
