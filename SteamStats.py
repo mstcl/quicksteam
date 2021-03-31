@@ -144,6 +144,8 @@ class Tasks():
         print(" |")
         print(" |-[u] Change user")
         print(" |")
+        print(" |-[f] View all friends and their statuses.")
+        print(" |")
         print(" |-[h] Print this help block")
         print(" |")
         print(" |-[x] Exit quicksteam")
@@ -204,6 +206,7 @@ class Menu:
             while not has_id:
                 has_id = execute.user_task()
             user_privacy = execute.privacy_task()
+            #print(user_privacy)
             if menu.selection == "e":
                 selection_valid = False
             while not selection_valid:
